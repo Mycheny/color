@@ -1,5 +1,6 @@
 import collections
 import colorsys
+import copy
 import csv
 import math
 import os
@@ -151,7 +152,7 @@ class ColorIdentify(object):
         """
         texture = cv2.Canny(frame, 100, 200)  # 边缘检测
         texture_len = np.sum(texture == 255)  # 边缘长度
-        print(texture_len)
+        # print(texture_len)
         if texture_len < 2500:
             return ColorType.PURE  # 返回纯色类型
         elif texture_len < 4000:
@@ -237,7 +238,7 @@ class ColorIdentify(object):
             score = (saturation + 0.1) * count
             dominant_colors.append([[r, g, b], score])
         dominant_colors.sort(key=takeSecond, reverse=True)
-        if len(dominant_colors)==0:
+        if len(dominant_colors) == 0:
             dominant_colors = [[[frame[..., 0].mean(), frame[..., 1].mean(), frame[..., 2].mean()], 1]]
         return dominant_colors
 
@@ -269,9 +270,9 @@ class ColorIdentify(object):
         def colour_distance_rgb2(rgb_1, rgb_2):
             v1 = np.array(rgb_1)
             v2 = np.array(rgb_2)
-            a = (v1 - v2)/256
+            a = (v1 - v2) / 256
             sim = np.sqrt(np.mean(np.square(a)))
-            return 1-sim
+            return 1 - sim
 
         def colour_distance_rgb3(rgb_1, rgb_2):
             v1 = np.array(rgb_1) / 255
@@ -283,9 +284,11 @@ class ColorIdentify(object):
             return sim
 
         def colour_distance_rgb4(rgb_1, rgb_2):
-            v1 = np.array(rgb_1) / 255
-            v2 = np.array(rgb_2) / 255
-            sim = np.sqrt(np.sum(np.square(v1-v2)))
+            hsv_1 = colorsys.rgb_to_hsv(rgb_1[0] / 255.0, rgb_1[1] / 255.0, rgb_1[2] / 255.0)
+            hsv_2 = colorsys.rgb_to_hsv(rgb_2[0] / 255.0, rgb_2[1] / 255.0, rgb_2[2] / 255.0)
+            v1 = np.array(hsv_1)
+            v2 = np.array(hsv_2)
+            sim = 1 - abs(v1[0] - v2[0])
             return sim
 
         def color_distance_lab2(rgb_1, rgb_2):
@@ -293,17 +296,16 @@ class ColorIdentify(object):
             from colormath.color_diff import delta_e_cie1976
             lab1 = RGB2Lab(rgb_1[::-1])
             lab2 = RGB2Lab(rgb_2[::-1])
-            # Reference color.
+
             color1 = LabColor(lab_l=lab1[0], lab_a=lab1[1], lab_b=lab1[2])
-            # Color to be compared to the reference.
             color2 = LabColor(lab_l=lab2[0], lab_a=lab2[1], lab_b=lab2[2])
-            # This is your delta E value as a float.
             delta_e = delta_e_cie1976(color1, color2)
-            return delta_e
+            # print(delta_e)
+            return 200 - delta_e
 
         def HSVDistance(rgb_1, rgb_2):
-            hsv_1 = colorsys.rgb_to_hsv(rgb_1[0]/255.0, rgb_1[1]/255.0, rgb_1[2]/255.0)
-            hsv_2 = colorsys.rgb_to_hsv(rgb_2[0]/255.0, rgb_2[1]/255.0, rgb_2[2]/255.0)
+            hsv_1 = colorsys.rgb_to_hsv(rgb_1[0] / 255.0, rgb_1[1] / 255.0, rgb_1[2] / 255.0)
+            hsv_2 = colorsys.rgb_to_hsv(rgb_2[0] / 255.0, rgb_2[1] / 255.0, rgb_2[2] / 255.0)
             H_1, S_1, V_1 = hsv_1
             H_2, S_2, V_2 = hsv_2
             R = 100
@@ -326,14 +328,14 @@ class ColorIdentify(object):
             similar_color = ""
             temp = -1
             for color_name, (r, g, b) in self.costume_color_dict.items():
-                # sim0 = colour_distance_rgb2(rgb, [r, g, b])
-                # sim1 = colour_distance_rgb(rgb, [r, g, b])
-                # sim2 = color_distance_lab2(rgb, [r, g, b])
-                # sim3 = color_distance_lab(rgb, [r, g, b])
-                sim = colour_distance_rgb3(rgb, [r, g, b])
-                # sim5 = colour_distance_rgb4(rgb, [r, g, b])
-                # sim6 = HSVDistance(rgb, [r, g, b])
-                # if color_name == "土色" or color_name == "暗灰":
+                sim0 = colour_distance_rgb2(rgb, [r, g, b])
+                sim1 = colour_distance_rgb(rgb, [r, g, b])
+                sim = color_distance_lab2(rgb, [r, g, b])
+                sim3 = color_distance_lab(rgb, [r, g, b])
+                sim4 = colour_distance_rgb3(rgb, [r, g, b])
+                sim5 = colour_distance_rgb4(rgb, [r, g, b])
+                sim6 = HSVDistance(rgb, [r, g, b])
+                # if color_name == "柠檬黄" or color_name == "黑色":
                 #     print(color_name, rgb, [r, g, b])
                 #     print(sim0)
                 #     print(sim1)
@@ -341,6 +343,7 @@ class ColorIdentify(object):
                 #     print(sim3)
                 #     print(sim4)
                 #     print(sim)
+                #     print(sim6)
                 if sim > temp:
                     temp = sim
                     similar_color = color_name
@@ -353,6 +356,7 @@ class ColorIdentify(object):
         :param frame:
         :return:
         """
+        frame = copy.deepcopy(frame)
         height = 256
         width = int(frame.shape[1] * height / frame.shape[0])
         img = cv2.resize(frame, (width, height))
@@ -365,11 +369,12 @@ class ColorIdentify(object):
 
         dominant_colors1 = self.get_dominant_color1(img2, temp_color_type, color_num)  # bgr
         # dominant_colors2 = self.get_dominant_color2(img2, temp_color_type, color_num)
-        color_names = self.get_color_names(dominant_colors1[:3])
+        color_names = self.get_color_names(dominant_colors1[:1])
         if not label_color_name is None:
-            self.drow(frame, label_color_name, color_names)
+            self.drow(frame, label_color_name, color_names, dominant_colors1[0][0])
+        return color_names
 
-    def drow(self, frame, label_name, pro_names):
+    def drow(self, frame, label_name, pro_names, color):
         w, h = 70, 70
         try:
             cv2.rectangle(frame, (0, 0), (w, h), self.costume_color_dict[label_name][::-1], -1)
@@ -380,6 +385,9 @@ class ColorIdentify(object):
         for i in range(len(pro_names)):
             cv2.rectangle(image2, ((i + 1) * w + (i + 1) * 10, 0), ((i + 2) * w + (i + 1) * 10, h),
                           self.costume_color_dict[pro_names[i]][::-1], -1)
+        i = 1
+        cv2.rectangle(image2, ((i + 1) * w + (i + 1) * 10, 0), ((i + 2) * w + (i + 1) * 10, h),
+                      color[::-1], -1)
         image2 = self.cv2ImgAddText(image2, f"检测为{' '.join(pro_names)}", 90, 80, textSize=14)
 
         file_path = f"image3/{label_name}_{'_'.join(pro_names)}_{np.random.random()}.jpg".encode('utf-8').decode(
@@ -424,14 +432,16 @@ if __name__ == '__main__':
     ci = ColorIdentify()
     root = "服饰"
     color_list = os.listdir(root)
+    count = 0
+    ok = 0
     for color in color_list:
         if "拼色" in color or "花色" in color:
             continue
         file_names = os.listdir(os.path.join(root, color))
         for file_name in file_names:
             file_path = os.path.join(root, color, file_name)
-            # file_path  = "服饰\深灰\深灰 (1).jpg"
-            # color = "深灰"
+            # file_path  = "服饰\柠檬黄\柠檬黄 (1).jpg"
+            # color = "柠檬黄"
             file_path = file_path.encode('utf-8').decode('utf-8')
             china = cv2.imdecode(np.fromfile(file_path, dtype=np.uint8), -1)
             if china is None:
@@ -441,8 +451,17 @@ if __name__ == '__main__':
                     imt = imt[0]
                     china = imt[:, :, 0:3]
             color_name = re.sub("[\(\)（） 0-9]*", "", color)
-            if china.shape[2]==4:
+            if china.shape[2] == 4:
                 china = china[..., :3]
             # print(color_name, file_path)
-            ci.predict(china, color_name)
-            # print()
+            c = ci.predict(china, color_name)
+            path = os.path.join(f"image4", c[0])
+            if not os.path.isdir(path):
+                os.mkdir(path)
+            # cv2.imwrite(os.path.join(path, f"{color_name}_{np.random.randint(1000, 9999)}.jpg"), china)
+            cv2.imencode('.jpg', china)[1].tofile(
+                os.path.join(path, f"{c[0]}_{color_name}_{np.random.randint(1000, 9999)}.jpg"))
+            if color_name == c[0]:
+                ok += 1
+            count += 1
+            print(f"{ok}/{count}")
