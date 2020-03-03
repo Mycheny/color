@@ -12,6 +12,7 @@ import re
 import matplotlib.pyplot as plt
 import xlrd
 from PIL import Image, ImageDraw, ImageFont
+from colormath.color_diff import delta_e_cie2000, delta_e_cmc
 from sklearn.cluster import DBSCAN, KMeans
 from sklearn.metrics import silhouette_score
 
@@ -178,7 +179,7 @@ class ColorIdentify(object):
             pro = np.sum(mask == 255) / mask.size
             # cv2.imshow(d, mask)
             # print(d, pro)
-            if pro > 0.1 / len(color_dict.keys()):
+            if pro > 0.9 / len(color_dict.keys()):
                 count += 1
         # cv2.waitKey(0)
         return count
@@ -299,7 +300,7 @@ class ColorIdentify(object):
 
             color1 = LabColor(lab_l=lab1[0], lab_a=lab1[1], lab_b=lab1[2])
             color2 = LabColor(lab_l=lab2[0], lab_a=lab2[1], lab_b=lab2[2])
-            delta_e = delta_e_cie1976(color1, color2)
+            delta_e = delta_e_cie2000(color1, color2)
             # print(delta_e)
             return 200 - delta_e
 
@@ -363,8 +364,7 @@ class ColorIdentify(object):
         temp_color_type = self.get_color_type(img)
         color_num = self.get_n_color(img)
         img2 = self.get_dominant_image(img, color_num).astype(np.uint8)
-        # cv2.imshow("img", img)
-        # cv2.imshow("img2", img2)
+        # cv2.imshow("img", np.hstack((img, img2)))
         # cv2.waitKey(0)
 
         dominant_colors1 = self.get_dominant_color1(img2, temp_color_type, color_num)  # bgr
@@ -379,7 +379,7 @@ class ColorIdentify(object):
         try:
             cv2.rectangle(frame, (0, 0), (w, h), self.costume_color_dict[label_name][::-1], -1)
         except Exception as e:
-            print(e)
+            print("error", e)
         image2 = self.cv2ImgAddText(frame, f"标注为{label_name}", 10, 80, textSize=14)
 
         for i in range(len(pro_names)):
@@ -389,8 +389,10 @@ class ColorIdentify(object):
         cv2.rectangle(image2, ((i + 1) * w + (i + 1) * 10, 0), ((i + 2) * w + (i + 1) * 10, h),
                       color[::-1], -1)
         image2 = self.cv2ImgAddText(image2, f"检测为{' '.join(pro_names)}", 90, 80, textSize=14)
-
-        file_path = f"image3/{label_name}_{'_'.join(pro_names)}_{np.random.random()}.jpg".encode('utf-8').decode(
+        path = os.path.join(f"image7", pro_names[0])
+        if not os.path.isdir(path):
+            os.mkdir(path)
+        file_path = f"{path}/{label_name}_{'_'.join(pro_names)}_{np.random.random()}.jpg".encode('utf-8').decode(
             'utf-8')
         # cv2.imwrite(file_path, image2)
         cv2.imencode('.jpg', image2)[1].tofile(file_path)
@@ -430,7 +432,7 @@ class ColorIdentify(object):
 
 if __name__ == '__main__':
     ci = ColorIdentify()
-    root = "服饰"
+    root = "test"
     color_list = os.listdir(root)
     count = 0
     ok = 0
@@ -440,8 +442,8 @@ if __name__ == '__main__':
         file_names = os.listdir(os.path.join(root, color))
         for file_name in file_names:
             file_path = os.path.join(root, color, file_name)
-            # file_path  = "服饰\柠檬黄\柠檬黄 (1).jpg"
-            # color = "柠檬黄"
+            # file_path  = "服饰\黄色\黄色 (2).jpg"
+            # color = "黄色"
             file_path = file_path.encode('utf-8').decode('utf-8')
             china = cv2.imdecode(np.fromfile(file_path, dtype=np.uint8), -1)
             if china is None:
@@ -450,17 +452,18 @@ if __name__ == '__main__':
                     imt = np.array(tmp)
                     imt = imt[0]
                     china = imt[:, :, 0:3]
-            color_name = re.sub("[\(\)（） 0-9]*", "", color)
+            # color_name = re.sub("[\(\)（） 0-9]*", "", color)
+            color_name = re.sub("[\(\)（） 0-9jpg.]*", "", file_name)
             if china.shape[2] == 4:
                 china = china[..., :3]
             # print(color_name, file_path)
             c = ci.predict(china, color_name)
-            path = os.path.join(f"image4", c[0])
+            path = os.path.join(f"image7", c[0])
             if not os.path.isdir(path):
                 os.mkdir(path)
             # cv2.imwrite(os.path.join(path, f"{color_name}_{np.random.randint(1000, 9999)}.jpg"), china)
-            cv2.imencode('.jpg', china)[1].tofile(
-                os.path.join(path, f"{c[0]}_{color_name}_{np.random.randint(1000, 9999)}.jpg"))
+            # cv2.imencode('.jpg', china)[1].tofile(
+            #     os.path.join(path, f"{c[0]}_{color_name}_{np.random.randint(1000, 9999)}.jpg"))
             if color_name == c[0]:
                 ok += 1
             count += 1
