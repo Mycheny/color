@@ -5,18 +5,15 @@ import colorsys
 import copy
 import math
 import operator
-import re
 import time
 
 import cv2
 import numpy as np
-import xlrd
 from PIL import Image, ImageDraw, ImageFont
 from colormath.color_objects import LabColor
 from colormath.color_diff import delta_e_cie1976, delta_e_cie1994, delta_e_cie2000
 
 from rgb2lab import RGB2Lab
-np.random.seed(0)
 
 frame = None
 group_colors = {}
@@ -107,7 +104,7 @@ def color_distance(rgb_1, rgb_2):
     lab2 = RGB2Lab(rgb_2[::-1])
     color1 = LabColor(lab_l=lab1[0], lab_a=lab1[1], lab_b=lab1[2])
     color2 = LabColor(lab_l=lab2[0], lab_a=lab2[1], lab_b=lab2[2])
-    delta_e = delta_e_cie2000(color1, color2, Kl=1, Kc=1, Kh=1) # Kl 亮度, Kc 饱和度, Kh 色调 的权重
+    delta_e = delta_e_cie2000(color1, color2, Kl=2, Kc=2, Kh=2)
     return delta_e
 
 
@@ -160,8 +157,7 @@ def HSVDistance(rgb_1, rgb_2):
     return math.sqrt(dx * dx + dy * dy + dz * dz)
 
 def run1():
-    global frame, group_colors, sleep
-    sleep = 1
+    global frame, group_colors
     frame2 = np.copy(frame)
     means = {}
     mean = 0
@@ -192,7 +188,7 @@ def run1():
             group_colors[min_distance_index] = [[color1, min_distance_value]]
         # drow(min_distance_index, min_distance_value, means, frame2, i)
         cv2.imshow(window_name, frame)
-        cv2.waitKey(sleep)
+        cv2.waitKey(1)
     cv2.waitKey(0)
 
 
@@ -299,37 +295,7 @@ def g_color2():
                     "#FF00FF", "#000000",]
     colors0x = gradient_color(input_colors, color_sum=216+8)
     colors = [[int(f'0x{color[1:3]}',16), int(f'0x{color[3:5]}',16), int(f'0x{color[5:7]}',16)] for color in colors0x]
-
-
-def get_costume_color_dict(file_path=r'E:\PycharmProjects\服饰颜色识别\颜色\猪圈关键字（55色）(4)(1).xlsx'):
-    costume_color_dict = {}
-    # 文件路径的中文转码，如果路径非中文可以跳过
-    file_path = file_path.encode('utf-8').decode('utf-8')
-    # 获取数据
-    data = xlrd.open_workbook(file_path)
-    table = data.sheet_by_name('猪圈颜色')
-    nrows = table.nrows
-    # 获取一行的数值，例如第5行
-    for i in range(nrows):
-        rowvalue = table.row_values(i)
-        color_name1 = rowvalue[2]
-        color_value1 = rowvalue[3]
-        color_name2 = rowvalue[6]
-        color_value2 = rowvalue[7]
-        if re.match('[0-9]* [0-9]* [0-9]*', color_value1):
-            costume_color_dict[color_name1] = [int(i) for i in color_value1.split(" ")]
-        if re.match('[0-9]* [0-9]* [0-9]*', color_value2):
-            costume_color_dict[color_name2] = [int(i) for i in color_value2.split(" ")]
-    return costume_color_dict
-
-
-def g_color3():
-    global colors
-    costume_color_dict = get_costume_color_dict()
-    colors1 = [RGB_list_to_Hex(color) for color in costume_color_dict.values()]
-    colors1 = colors1[::2]+colors1[1::2]
-    colors = [[int(f'0x{color[1:3]}', 16), int(f'0x{color[3:5]}', 16), int(f'0x{color[5:7]}', 16)] for color in
-               colors1]
+    print()
 
 
 if __name__ == '__main__':
@@ -338,14 +304,13 @@ if __name__ == '__main__':
     cv2.namedWindow(window_name)
     cv2.setMouseCallback(window_name, MouseEvent)  # 窗口与回调函数绑定
 
-    g_color()
+    # g_color()
     g_color2()
-    g_color3()
 
     console_h = 40
     # cell_w = 18
     # cell_h = 12
-    cell_w = 20
+    cell_w = 36
     cell_h = 6
     n = 36
     side = 10

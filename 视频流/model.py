@@ -96,6 +96,7 @@ class Model(object):
                 textColor = (255, 255, 255) if brightness < 0.5 else (0, 0, 0)
                 self.frame = self.cv2ImgAddText(self.frame, f"{int(distance)}", x1, y1, textColor=textColor,
                                                 textSize=14)
+                time.sleep(0.001)
 
             cv2.rectangle(self.frame, (last_x1, last_y1), (last_x2, last_y2),
                           self.colors[last_min_distance_index][::-1], 1)
